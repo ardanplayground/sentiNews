@@ -111,15 +111,12 @@ class NewsAPIClient:
     """Client untuk berbagai News API gratis"""
     
     def __init__(self):
-        # API Keys - GANTI DENGAN KEY ANDA SENDIRI!
-        # Daftar gratis di:
-        # - https://newsdata.io/register
-        # - https://gnews.io/register
-        # - https://newsapi.org/register
+        # ========================================================================
+        # API KEYS - SUDAH DIISI
+        # ========================================================================
         
-        self.newsdata_key = "pub_632818f4e8b3c9d0a5e7f1b2c9a4d6e8"
-        self.gnews_key = "c8e3b4a5f2d1a0c7e9b6f8d5a3e1c4b2"
-        self.newsapi_key = "8d0b6f8e5f3c4c7b9e2d1a0f5c8e3b4a"
+        self.newsdata_key = "pub_cde750ce48074b45a714654be4063bf4"
+        self.gnews_key = "20279dd1f36d7ad62d50144631657942"
         
     def fetch_newsdata_io(self, query, language='en', max_results=50):
         """NewsData.io API - Free tier: 200 requests/day"""
@@ -197,47 +194,6 @@ class NewsAPIClient:
         except Exception as e:
             st.warning(f"GNews: {str(e)[:50]}")
             return []
-    
-    def fetch_newsapi_org(self, query, language='en', days_back=7, max_results=100):
-        """NewsAPI.org - Free tier: 100 requests/day"""
-        url = "https://newsapi.org/v2/everything"
-        
-        date_from = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
-        
-        params = {
-            'q': query,
-            'from': date_from,
-            'language': language,
-            'sortBy': 'publishedAt',
-            'pageSize': min(max_results, 100),
-            'apiKey': self.newsapi_key
-        }
-        
-        try:
-            response = requests.get(url, params=params, timeout=15)
-            if response.status_code == 200:
-                data = response.json()
-                articles = []
-                
-                if data.get('status') == 'ok' and 'articles' in data:
-                    for item in data['articles']:
-                        articles.append({
-                            'title': item.get('title', ''),
-                            'description': item.get('description', ''),
-                            'content': item.get('content', ''),
-                            'source': item.get('source', {}).get('name', 'Unknown'),
-                            'url': item.get('url', ''),
-                            'publishedAt': item.get('publishedAt', ''),
-                            'image': item.get('urlToImage', '')
-                        })
-                
-                return articles
-            else:
-                return []
-                
-        except Exception as e:
-            st.warning(f"NewsAPI.org: {str(e)[:50]}")
-            return []
 
 
 # ============================================================================
@@ -248,43 +204,26 @@ def aggregate_news(query, news_type='both', max_articles=100):
     client = NewsAPIClient()
     all_articles = []
     
-    # Demo data untuk testing (hapus/comment bagian ini jika API sudah ready)
-    demo_articles = []
-    for i in range(max_articles):
-        sentiment_type = ['positive', 'negative', 'neutral'][i % 3]
-        demo_articles.append({
-            'title': f'{query} - Berita {i+1}: {"Naik" if sentiment_type == "positive" else "Turun" if sentiment_type == "negative" else "Stabil"} di Pasar',
-            'description': f'Analisis menunjukkan pergerakan {"positif dengan rally kuat" if sentiment_type == "positive" else "negatif dengan tekanan jual" if sentiment_type == "negative" else "netral tanpa perubahan signifikan"}.',
-            'content': '',
-            'source': f'Demo News {(i % 10) + 1}',
-            'url': f'https://example.com/news/{i+1}',
-            'publishedAt': datetime.now().isoformat(),
-            'image': ''
-        })
+    if news_type in ['international', 'both']:
+        # Ambil dari NewsData.io (English)
+        articles1 = client.fetch_newsdata_io(query, language='en', max_results=50)
+        all_articles.extend(articles1)
+        time.sleep(0.5)
+        
+        # Ambil dari GNews (English)
+        articles2 = client.fetch_gnews(query, language='en', max_results=50)
+        all_articles.extend(articles2)
+        time.sleep(0.5)
     
-    # Uncomment untuk pakai API real (comment bagian demo di atas)
-    # if news_type in ['international', 'both']:
-    #     articles1 = client.fetch_newsdata_io(query, language='en', max_results=50)
-    #     all_articles.extend(articles1)
-    #     time.sleep(0.5)
-    #     
-    #     articles2 = client.fetch_gnews(query, language='en', max_results=50)
-    #     all_articles.extend(articles2)
-    #     time.sleep(0.5)
-    #     
-    #     articles3 = client.fetch_newsapi_org(query, language='en', max_results=50)
-    #     all_articles.extend(articles3)
-    # 
-    # if news_type in ['local', 'both']:
-    #     articles4 = client.fetch_gnews(query, language='id', country='id', max_results=50)
-    #     all_articles.extend(articles4)
-    #     time.sleep(0.5)
-    #     
-    #     articles5 = client.fetch_newsdata_io(query, language='id', max_results=50)
-    #     all_articles.extend(articles5)
-    
-    # Gunakan demo data
-    all_articles = demo_articles
+    if news_type in ['local', 'both']:
+        # Ambil dari GNews (Indonesia)
+        articles3 = client.fetch_gnews(query, language='id', country='id', max_results=50)
+        all_articles.extend(articles3)
+        time.sleep(0.5)
+        
+        # Ambil dari NewsData.io (Indonesia)
+        articles4 = client.fetch_newsdata_io(query, language='id', max_results=50)
+        all_articles.extend(articles4)
     
     # Hapus duplikat
     seen_titles = set()
@@ -482,15 +421,15 @@ with st.sidebar:
     st.markdown("---")
     
     st.markdown("""
-    ### 💡 Info
+    ### 💡 API yang Digunakan
     
-    **API Gratis:**
-    - NewsData.io
-    - GNews.io
-    - NewsAPI.org
+    **2 Sumber Berita:**
+    - ✅ NewsData.io (200 req/hari)
+    - ✅ GNews.io (100 req/hari)
     
-    **Ganti API Key:**
-    Edit bagian `NewsAPIClient` di script ini
+    **Status:** Siap Digunakan! 🚀
+    
+    Total: ~300 requests/hari
     """)
 
 # Main Content
@@ -756,9 +695,9 @@ else:
     with col3:
         st.markdown("""
         #### 📡 API
-        - NewsData.io
-        - GNews.io
-        - NewsAPI.org
+        - NewsData.io ✅
+        - GNews.io ✅
+        - Total: 300 req/hari
         """)
 
 # Footer
@@ -766,6 +705,7 @@ st.markdown("---")
 st.markdown("""
 <div style="text-align:center;color:#666;padding:1rem;">
     <p><b>📊 Sentiment Analysis Dashboard</b></p>
-    <p>💡 Demo mode aktif - Ganti API key untuk data real</p>
+    <p>Powered by NewsData.io & GNews.io</p>
+    <p style="font-size:0.9rem;">✅ API Keys sudah terpasang - Siap digunakan!</p>
 </div>
 """, unsafe_allow_html=True)
